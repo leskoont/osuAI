@@ -51,6 +51,7 @@ class SimEnv:
         self.fid = 0
         self.cursor = (0.5, 0.5)
         self.held = False
+        self._press_t = -1e9
         self._ended = False
         self.new_map()
 
@@ -163,7 +164,13 @@ class SimEnv:
                 nx, ny = n.x, n.y
                 press = int(abs(self.t - n.t) <= self.dt * 0.6 and not self.held)
                 break
+        # как человек: держим клавишу ~50 мс после нажатия, затем отпускаем
+        if not press and self.held and self.t - self._press_t < 50.0:
+            press = 1
+            nx, ny = self.cursor
         onset = self.act(nx, ny, press)
+        if onset:
+            self._press_t = self.t
         return nx, ny, press, onset
 
     def focus(self) -> bool:
