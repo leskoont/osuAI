@@ -146,8 +146,11 @@ class RewardShaper:
             d = np.hypot(x - target.x, (y - target.y) * self.aspect)
             reward += c.proximity * target.urgency * float(np.exp(-0.5 * (d / target.r) ** 2))
             if onset:
-                if d <= target.r * 1.1 and target.urgency >= 0.8:
-                    reward += c.click_good * target.urgency
+                # бонус только в последние ~90 мс (при AR8) и максимален в момент удара:
+                # иначе эвристика поощряла бы ранние нажатия на 50/100
+                timing = (target.urgency - 0.85) / 0.15
+                if d <= target.r * 1.1 and timing > 0:
+                    reward += c.click_good * timing
                 else:
                     reward -= c.click_spam
         elif onset:

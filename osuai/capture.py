@@ -75,6 +75,8 @@ class _DxcamBackend:
                  monitor_origin: tuple[int, int]):
         import dxcam
 
+        if output < 0:
+            output = self._find_output(dxcam, region)
         self.cam = dxcam.create(output_idx=None if output < 0 else output, output_color="BGRA")
         ox, oy = monitor_origin
         try:  # точное смещение выхода на виртуальном рабочем столе (внутреннее поле dxcam)
@@ -84,6 +86,29 @@ class _DxcamBackend:
             pass
         l, t, r, b = region
         self.cam.start(region=(l - ox, t - oy, r - ox, b - oy), target_fps=fps, video_mode=True)
+
+    @staticmethod
+    def _find_output(dxcam, region: tuple[int, int, int, int]) -> int:
+        """Выход (монитор), на котором находится центр области; -1 — основной."""
+        cx, cy = (region[0] + region[2]) // 2, (region[1] + region[3]) // 2
+        for idx in range(8):
+            try:
+                cam = dxcam.create(output_idx=idx, output_color="BGRA")
+            except Exception:
+                break
+            try:
+                dc = cam._output.desc.DesktopCoordinates
+                if dc.left <= cx < dc.right and dc.top <= cy < dc.bottom:
+                    return idx
+            except Exception:
+                return -1
+            finally:
+                try:
+                    cam.release()
+                except Exception:
+                    pass
+                del cam
+        return -1
 
     def grab(self) -> np.ndarray | None:
         return self.cam.get_latest_frame()

@@ -159,6 +159,8 @@ class Runner:
                   f"макс. комбо {e['max_combo']}")
 
     def _current_eps(self) -> float:
+        if self.mode == "record":
+            return 0.0
         if self.mode == "play":
             return self.cfg.agent.eval_eps
         return self.eps(self.env_steps)
