@@ -1,0 +1,49 @@
+# Пресет под i5-10400 (6C/12T) + RTX 2060 6 GB + 32 GB RAM.
+# Любой параметр можно переопределить: python main.py train --set train.batch_size=128
+# Полный список параметров и значения по умолчанию — osuai/config.py
+
+[capture]
+backend = "auto"          # dxcam (Desktop Duplication) → запасной mss
+region = "playfield"      # снимаем только игровое поле с полями, а не весь монитор
+target_fps = 144          # захват быстрее agent.hz → актор всегда получает свежий кадр
+
+[obs]
+height = 96               # 96x128 uint8 — ~2.3 osu!px на пиксель по вертикали, круги ~9 px
+width = 128
+stack = 4                 # 4 кадра = ~67 мс истории при 60 Гц — видно, как сжимается approach circle
+
+[model]
+channels = 64             # ~0.33M параметров; инференс fp16 + CUDA Graph ≈ 0.3-0.6 мс
+blocks = 4
+
+[agent]
+hz = 60.0                 # 1 шаг = 16.7 мс; окно 300 при OD8 = ±32 мс
+eps_decay_steps = 150000  # ~42 минуты игры до eps_end
+guided_prob = 0.5
+
+[train]
+device = "auto"
+amp = true                # fp16 + tensor cores Turing
+cuda_graphs = true
+compile = false           # torch.compile на Windows требует triton-windows
+batch_size = 64
+replay_ratio = 0.5        # 30 апдейтов/с при 60 Гц — ~25-35% GPU RTX 2060, остальное osu!
+replay_capacity = 400000  # ~4.9 GB RAM (кадры uint8 без дублирования стека)
+learning_starts = 5000
+n_step = 3
+gamma = 0.95
+prefetch = 3
+
+[system]
+torch_threads = 4         # 12 логических потоков: 4 torch + 2 OpenCV + захват/актор/learner + osu!
+cv2_threads = 2
+process_priority = "above_normal"
+timer_resolution_ms = 1
+
+[vis]
+enabled = true
+hz = 15.0                 # окно отладки в своём потоке и редко — почти бесплатно
+
+[tosu]
+enabled = true            # https://github.com/tosuapp/tosu — точные 300/100/50/miss из памяти игры
+url = "ws://127.0.0.1:24050/ws"
