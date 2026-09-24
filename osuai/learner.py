@@ -132,6 +132,8 @@ class Learner:
         self.pause_event = threading.Event()
         self.updates_per_sec = 0.0
         self._skipped = 0.0  # апдейты, «прощённые» после долгой паузы обучения
+        self._upd_base = 0  # счётчики на момент загрузки чекпоинта
+        self._env_base = 0
         self.publish_weights()  # актор стартует с теми же весами, что и learner
 
     # ------------------------------------------------------------------ batches
@@ -281,12 +283,16 @@ class Learner:
             self.scaler.load_state_dict(sd["scaler"])
         self.updates = int(sd.get("updates", 0))
         self.env_steps = int(sd.get("env_steps", 0))
+        self._upd_base, self._env_base = self.updates, self.env_steps
         self.publish_weights()
         return True
 
     # ------------------------------------------------------------------ thread
     def allowed_updates(self) -> float:
-        return (self.env_steps - self.tc.learning_starts) * self.tc.replay_ratio - self._skipped
+        """Бюджет апдейтов этой сессии: replay_ratio от шагов, сделанных после загрузки
+        (иначе апдейты предобучения «съедали» бы бюджет, и онлайн-обучение долго стояло бы)."""
+        steps = self.env_steps - self._env_base - self.tc.learning_starts
+        return self._upd_base + steps * self.tc.replay_ratio - self._skipped
 
     def _forgive_backlog(self) -> None:
         """После долгой паузы обучения не «догоняем» тысячами апдейтов подряд."""

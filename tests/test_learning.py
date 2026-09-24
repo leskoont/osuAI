@@ -72,3 +72,15 @@ def test_dqfd_pretrain_from_demos(small_cfg, tmp_path):
     l2 = Learner(small_cfg, torch.device("cpu"), None, demos)
     assert l2.load(path) and l2.updates == learner.updates
     assert _accuracy(l2, test) == _accuracy(learner, test)
+
+
+def test_update_budget_starts_after_checkpoint(small_cfg):
+    buf = ReplayBuffer(100, (32, 32), 2, 3, 0.9, 64)
+    l1 = Learner(small_cfg, torch.device("cpu"), buf)
+    l1.updates, l1.env_steps = 5000, 0  # как после pretrain
+    l1.save()
+    l2 = Learner(small_cfg, torch.device("cpu"), buf)
+    l2.tc.learning_starts, l2.tc.replay_ratio = 100, 0.5
+    assert l2.load()
+    l2.env_steps = 300
+    assert l2.allowed_updates() - l2.updates == 100  # (300 - 100) * 0.5, а не -4900
